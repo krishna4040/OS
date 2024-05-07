@@ -1,232 +1,104 @@
-#include "bits/stdc++.h"
+#include <iostream>
+#include <queue>
+
 using namespace std;
 
-class Node
+// Structure to represent a process
+struct Process
 {
-public:
-    string data;
-    Node *next;
-    Node(string value) : data(value), next(nullptr) {}
+    int id;          // Process ID
+    int arrivalTime; // Arrival time of the process
+    int burstTime;   // Burst time of the process
 };
 
-class Queue
+// Function to perform Round Robin scheduling
+void roundRobinScheduling(Process processes[], int n, int quantum)
 {
-private:
-    Node *front;
-    Node *rear;
+    queue<Process> readyQueue;   // Queue to store processes ready for execution
+    int remainingBurstTime[n];   // Array to store remaining burst time for each process
+    int currentTime = 0;         // Current time
+    int totalTurnaroundTime = 0; // Total turnaround time of all processes
+    int totalWaitingTime = 0;    // Total waiting time of all processes
 
-public:
-    Queue() : front(nullptr), rear(nullptr) {}
-
-    bool isEmpty()
-    {
-        return front == nullptr;
-    }
-
-    void enqueue(string pid)
-    {
-        Node *newNode = new Node(pid);
-        if (isEmpty())
-        {
-            front = rear = newNode;
-        }
-        else
-        {
-            rear->next = newNode;
-            rear = newNode;
-        }
-    }
-
-    string dequeue()
-    {
-        if (isEmpty())
-        {
-            std::cerr << "Queue is empty" << std::endl;
-            return nullptr;
-        }
-
-        string value = front->data;
-        Node *temp = front;
-
-        if (front == rear)
-        {
-            front = rear = nullptr;
-        }
-        else
-        {
-            front = front->next;
-        }
-        delete temp;
-        return value;
-    }
-
-    string peek()
-    {
-        if (isEmpty())
-        {
-            std::cerr << "Queue is empty" << std::endl;
-            return nullptr;
-        }
-
-        return front->data;
-    }
-
-    void display()
-    {
-        if (isEmpty())
-        {
-            std::cout << "Queue is empty" << std::endl;
-            return;
-        }
-
-        Node *current = front;
-        while (current != nullptr)
-        {
-            std::cout << current->data << " ";
-            current = current->next;
-        }
-        std::cout << std::endl;
-    }
-};
-
-struct process
-{
-    string processID;
-    int arrivalTime;
-    int burstTime;
-    int completionTime;
-    int turnAroundTime;
-    int waitingTime;
-};
-
-bool arrivalTimeSort(process a, process b)
-{
-    return a.arrivalTime < b.arrivalTime;
-}
-
-process getProcess(string pid, vector<process> &processes)
-{
-    for (auto &&p : processes)
-        if (p.processID == pid)
-            return p;
-}
-
-int getTAT(process p)
-{
-    return p.completionTime - p.arrivalTime;
-}
-
-int getWT(process p)
-{
-    return p.turnAroundTime - p.burstTime;
-}
-
-int computeTotalBurstTime(vector<process> &processes)
-{
-    int totalBurstTime = 0;
-    for (auto &&p : processes)
-        totalBurstTime += p.burstTime;
-    return totalBurstTime;
-}
-
-void displayProccess(vector<process> &processes)
-{
-    for (auto &&p : processes)
-    {
-        cout << "PID: " << p.processID << endl;
-        cout << "CompletionTime: " << p.completionTime << endl;
-        cout << "TurnAround Time: " << p.turnAroundTime << endl;
-        cout << "Waiting Time: " << p.waitingTime << endl;
-    }
-}
-
-void RoundRobinScheduling(vector<process> &processes, int timeQuantum)
-{
-    sort(processes.begin(), processes.end(), arrivalTimeSort);
-    Queue *ready_queue = new Queue();
-    Queue *running_queue = new Queue();
-
-    int currProcessIdx = 0;
-    int timeMeasure = 0;
-
-    process firstProcess = processes[currProcessIdx];
-    timeMeasure = firstProcess.arrivalTime;
-    ready_queue->enqueue(firstProcess.processID);
-    while (!ready_queue->isEmpty())
-    {
-        string current_readyProcess_pid = ready_queue->dequeue();
-
-        cout << "CURRENT_PROCESS_ID--->" << current_readyProcess_pid;
-
-        process currentProcess = getProcess(current_readyProcess_pid, processes);
-        running_queue->enqueue(currentProcess.processID);
-        if (!running_queue->isEmpty())
-        {
-            string running_process_pid = running_queue->dequeue();
-            process running_process = getProcess(running_process_pid, processes);
-            if (running_process.burstTime <= timeQuantum)
-            {
-                timeMeasure += running_process.burstTime;
-                running_process.completionTime = timeMeasure;
-                running_process.burstTime = 0;
-            }
-            else
-            {
-                running_process.burstTime -= timeQuantum;
-                timeMeasure += timeQuantum;
-            }
-        }
-
-        if (currProcessIdx < processes.size())
-        {
-            process nextProcess = processes[++currProcessIdx];
-            if (nextProcess.arrivalTime >= timeMeasure)
-                ready_queue->enqueue(nextProcess.processID);
-        }
-        else
-        {
-            currProcessIdx--;
-            ready_queue->enqueue(currentProcess.processID);
-        }
-    }
-}
-
-int main(int argc, char const *argv[])
-{
-    int n;
-    cout << "Enter Number of Processes: ";
-    cin >> n;
-
-    vector<process> processes(n);
+    // Initialize remaining burst time for each process
     for (int i = 0; i < n; i++)
     {
-        cout << "Enter Process ID: ";
-        cin >> processes[i].processID;
-
-        cout << "Enter Process Arrival time: ";
-        cin >> processes[i].arrivalTime;
-
-        cout << "Enter Burst time: ";
-        cin >> processes[i].burstTime;
+        remainingBurstTime[i] = processes[i].burstTime;
     }
 
-    int timeQuantum;
-    cout << "Enter Time Quantum: ";
-    cin >> timeQuantum;
-
-    cout << "-----------------" << endl;
-    int totalBurstTime = computeTotalBurstTime(processes);
-    cout << "Total burst time is: " << totalBurstTime << endl;
-
-    RoundRobinScheduling(processes, timeQuantum);
-    for (auto &&p : processes)
+    int currentIndex = 0; // Index to keep track of current process in the processes array
+    // Loop until all processes are executed
+    while (!readyQueue.empty() || currentIndex < n)
     {
-        p.turnAroundTime = getTAT(p);
-        p.waitingTime = getWT(p);
+        // Add processes arriving at the current time to the ready queue
+        while (currentIndex < n && processes[currentIndex].arrivalTime <= currentTime)
+        {
+            readyQueue.push(processes[currentIndex]);
+            currentIndex++;
+        }
+
+        // If no process is ready to execute, move to the next arrival time
+        if (readyQueue.empty())
+        {
+            currentTime = processes[currentIndex].arrivalTime;
+            continue;
+        }
+
+        // Get the next process from the ready queue
+        Process currentProcess = readyQueue.front();
+        readyQueue.pop();
+
+        // Execute the process for a time quantum or its remaining burst time, whichever is smaller
+        int executionTime = min(quantum, remainingBurstTime[currentProcess.id]);
+        remainingBurstTime[currentProcess.id] -= executionTime;
+        currentTime += executionTime;
+
+        // If the process still has remaining burst time, add it back to the ready queue
+        if (remainingBurstTime[currentProcess.id] > 0)
+        {
+            readyQueue.push(currentProcess);
+        }
+        else
+        {
+            // Calculate turnaround time and waiting time for the completed process
+            int turnaroundTime = currentTime - currentProcess.arrivalTime;
+            int waitingTime = turnaroundTime - currentProcess.burstTime;
+            totalTurnaroundTime += turnaroundTime;
+            totalWaitingTime += waitingTime;
+        }
     }
 
-    cout << "--------------------------" << endl;
-    displayProccess(processes);
+    // Calculate and print average turnaround time and average waiting time
+    cout << "Average Turnaround Time: " << (float)totalTurnaroundTime / n << endl;
+    cout << "Average Waiting Time: " << (float)totalWaitingTime / n << endl;
+}
+
+// Main function
+int main()
+{
+    // Prompt the user to enter the number of processes
+    int n;
+    cout << "Enter the number of processes: ";
+    cin >> n;
+
+    // Array to store processes
+    Process processes[n];
+    // Prompt the user to enter arrival time and burst time for each process
+    cout << "Enter arrival time and burst time for each process:\n";
+    for (int i = 0; i < n; i++)
+    {
+        processes[i].id = i;
+        cout << "Process " << i << ": ";
+        cin >> processes[i].arrivalTime >> processes[i].burstTime;
+    }
+
+    // Prompt the user to enter time quantum for Round Robin scheduling
+    int quantum;
+    cout << "Enter time quantum: ";
+    cin >> quantum;
+
+    // Call the Round Robin scheduling function
+    roundRobinScheduling(processes, n, quantum);
 
     return 0;
 }
